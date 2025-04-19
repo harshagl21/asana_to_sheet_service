@@ -8,12 +8,14 @@ app = Flask(__name__)
 
 @app.route("/fetch-asana", methods=["GET"])
 def fetch_and_write_sheet1():
+    # Read required credentials from environment
     token = os.environ["ASANA_TOKEN"]
     workspace_id = os.environ["ASANA_WORKSPACE"]
     user_id = os.environ["ASANA_USER_ID"]
     from_date = request.args.get("from")
     to_date = request.args.get("to")
 
+    # Fetch filtered tasks from Asana
     tasks = get_asana_tasks(token, workspace_id, user_id, from_date, to_date)
 
     # Authenticate with Google Sheets
@@ -21,11 +23,11 @@ def fetch_and_write_sheet1():
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
-    creds = Credentials.from_service_account_file(os.environ["GOOGLE_SHEET_CREDS_PATH"], scopes=scopes)
+    creds = Credentials.from_service_account_file("/etc/secrets/service_account.json", scopes=scopes)
     client = gspread.authorize(creds)
     sheet = client.open_by_key("1-erzJK5KStrylPxfgOO20VUNa_zIs75HqELHGfT_6OA").worksheet("Sheet1")
 
-    # Write all tasks to Sheet1 (append only)
+    # Write each task as a new row
     written = 0
     for task in tasks:
         try:
@@ -42,6 +44,6 @@ def fetch_and_write_sheet1():
 
     return jsonify({"status": "written_to_sheet1", "tasks_written": written})
 
-# Local dev only
+# Local dev fallback
 if __name__ == "__main__":
     app.run(debug=True)
