@@ -1,3 +1,10 @@
+import os
+from flask import Flask, request, jsonify
+from asana_util import get_asana_tasks
+
+# ✅ Flask app must be defined before using @app.route
+app = Flask(__name__)
+
 @app.route("/fetch-asana", methods=["GET"])
 def fetch_and_write_asana():
     token = os.environ["ASANA_TOKEN"]
@@ -9,6 +16,8 @@ def fetch_and_write_asana():
     tasks = get_asana_tasks(token, workspace_id, user_id, from_date, to_date)
 
     # ===== Temporarily disable Google Sheets integration =====
+    # import gspread
+    # from google.oauth2.service_account import Credentials
     # scopes = [
     #     "https://www.googleapis.com/auth/spreadsheets",
     #     "https://www.googleapis.com/auth/drive"
@@ -31,5 +40,9 @@ def fetch_and_write_asana():
     #     except Exception as e:
     #         print(f"Error writing task to sheet: {e}")
 
-    # Return task info for now
+    # ✅ Return task info as JSON (for testing)
     return jsonify({"tasks_fetched": len(tasks), "tasks": tasks})
+
+# Optional: not needed on Render but useful for local testing
+if __name__ == "__main__":
+    app.run(debug=True)
