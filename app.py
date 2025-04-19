@@ -1,4 +1,3 @@
-
 import os
 from flask import Flask, request, jsonify
 from asana_util import get_asana_tasks
@@ -25,15 +24,21 @@ def fetch_and_write_asana():
     client = gspread.authorize(creds)
     sheet = client.open_by_key("1-erzJK5KStrylPxfgOO20VUNa_zIs75HqELHGfT_6OA").worksheet("Sheet1")
 
+    written = 0
     for task in tasks:
-        sheet.append_row([
-            task["name"],
-            task.get("created_at"),
-            task.get("completed_at"),
-            "✅" if task["completed"] else ""
-        ])
+        try:
+            sheet.append_row([
+                task.get("name", ""),
+                task.get("notes", ""),
+                task.get("created_at", ""),
+                task.get("completed_at", ""),
+                "✅" if task.get("completed") else ""
+            ])
+            written += 1
+        except Exception as e:
+            print(f"Error writing task to sheet: {e}")
 
-    return jsonify({"status": "done", "tasks_written": len(tasks)})
+    return jsonify({"status": "done", "tasks_written": written})
 
 if __name__ == "__main__":
     app.run(debug=True)
