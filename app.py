@@ -9,8 +9,8 @@ app = Flask(__name__)
 @app.route("/fetch-asana", methods=["GET"])
 def fetch_and_write_asana():
     token = os.environ["ASANA_TOKEN"]
-    workspace_id = request.args.get("workspace_id")
-    user_id = request.args.get("user_id")
+    workspace_id = os.environ["ASANA_WORKSPACE"]
+    user_id = os.environ["ASANA_USER_ID"]
     from_date = request.args.get("from")
     to_date = request.args.get("to")
 
