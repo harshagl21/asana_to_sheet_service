@@ -1,49 +1,53 @@
 import os
 from flask import Flask, request, jsonify
-from asana_util import get_asana_tasks
 import gspread
 from google.oauth2.service_account import Credentials
 
 app = Flask(__name__)
 
-@app.route("/fetch-asana", methods=["GET"])
-def fetch_and_write_sheet1():
-    # Read required credentials from environment
-    token = os.environ["ASANA_TOKEN"]
-    workspace_id = os.environ["ASANA_WORKSPACE"]
-    user_id = os.environ["ASANA_USER_ID"]
-    from_date = request.args.get("from")
-    to_date = request.args.get("to")
+# --- Google Sheets Setup ---
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets.readonly",
+    "https://www.googleapis.com/auth/drive.readonly"
+]
+SERVICE_ACCOUNT_PATH = "/etc/secrets/service_account.json"
+SPREADSHEET_KEY = "1-erzJK5KStrylPxfgOO20VUNa_zIs75HqELHGfT_6OA"
 
-    # Fetch filtered tasks from Asana
-    tasks = get_asana_tasks(token, workspace_id, user_id, from_date, to_date)
-
-    # Authenticate with Google Sheets
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    creds = Credentials.from_service_account_file("/etc/secrets/service_account.json", scopes=scopes)
+def get_sheet():
+    creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_PATH, scopes=SCOPES)
     client = gspread.authorize(creds)
-    sheet = client.open_by_key("1-erzJK5KStrylPxfgOO20VUNa_zIs75HqELHGfT_6OA").worksheet("Sheet1")
+    sheet = client.open_by_key(SPREADSHEET_KEY).worksheet("Sheet1")
+    return sheet
 
-    # Write each task as a new row
-    written = 0
-    for task in tasks:
-        try:
-            sheet.append_row([
-                task.get("name", ""),
-                task.get("notes", ""),
-                task.get("created_at", ""),
-                task.get("completed_at", ""),
-                "✅" if task.get("completed") else ""
-            ])
-            written += 1
-        except Exception as e:
-            print(f"Sheet write error: {e}")
+# --- Fetch specific row ---
+@app.route("/sheet", methods=["GET"])
+def get_row():
+    try:
+        row_number = int(request.args.get("row", 1))
+        sheet = get_sheet()
+        range_str = f"A{row_number}:Z{row_number}"
+        row_data = sheet.get(range_str)
 
-    return jsonify({"status": "written_to_sheet1", "tasks_written": written})
+        if not row_data or not any(row_data[0]):
+            return jsonify([])
 
-# Local dev fallback
+        return jsonify(row_data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# --- Fetch all rows (excluding header) ---
+@app.route("/fetch-all", methods=["GET"])
+def fetch_all_rows():
+    try:
+        sheet = get_sheet()
+        all_data = sheet.get_all_values()
+
+        if not all_data or len(all_data) <= 1:
+            return jsonify([])
+
+        return jsonify(all_data[1:])  # Skip header row
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     app.run(debug=True)
